@@ -71,7 +71,7 @@ int window_width = DEFAULT_WINDOW_WIDTH;
 int window_height = DEFAULT_WINDOW_HEIGHT;
 
 //POINT4D light_pos = {METER_TO_UNIT(0), METER_TO_UNIT(5), METER_TO_UNIT(0), 1.0f};
-POINT4D light_pos = {METER_TO_UNIT(0), METER_TO_UNIT(3), METER_TO_UNIT(0), 1.0f};
+POINT4D light_pos = {METER_TO_UNIT(0), METER_TO_UNIT(2.5), METER_TO_UNIT(0), 1.0f};
 RzColor3f light_color;
 RzColor3f ambient_light;
 RzColor3f specular_highlight;
@@ -349,10 +349,6 @@ void main_loop_function()
 
 		// draw the scene
 
-		glPushMatrix();
-
-		glRotatef(-90.0f, 1.0f, 0.0f, 0.0f);
-
 		glEnableClientState(GL_VERTEX_ARRAY);
 		glEnableClientState(GL_NORMAL_ARRAY);
 
@@ -394,8 +390,6 @@ void main_loop_function()
 
 		glDisableClientState(GL_VERTEX_ARRAY);
 		glDisableClientState(GL_NORMAL_ARRAY);
-
-		glPopMatrix();
 
 		/*
 		// the floor

@@ -19,7 +19,9 @@ def write_obj(filepath):
     mesh = Mesh.New()        
     mesh.getFromObject(ob.name)
     #put in world space
-    mesh.transform(ob.getMatrix())
+    mesh.transform(ob.getMatrix(), True)
+    #put in game coordinate system
+    mesh.transform(Mathutils.RotationMatrix(-90, 4, "X"), True) 
 
     editmode = Window.EditMode()
     if editmode: Window.EditMode(0)
@@ -124,5 +126,6 @@ def write_obj(filepath):
 #filename = os.path.splitext(Blender.Get('filename'))[0]
 sce = bpy.data.scenes.active
 ob = sce.objects.active
+#filename = os.path.splitext(ob.getData(True))[0]
 filename = ob.getData(True)
 Blender.Window.FileSelector(write_obj, "Export", '%s.h' % filename)
