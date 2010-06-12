@@ -37,10 +37,13 @@ using namespace std;
 #define PLAYER_MAX_SPEED 3.0f // meters per second
 #define PLAYER_MIN_SPEED 0.0f // meters per second
 #define SLOW_TURN_SPEED 72.0f // degrees per second
+#define MAX_TURN_SPEED 180.0f // degrees per second
+#define MIN_TURN_SPEED 0.0f // degrees per second
 
 float player_move_speed = 0; // meters per second
-float player_turn_speed = SLOW_TURN_SPEED; // degrees per second
+float player_turn_speed = 0; // degrees per second
 
+//int jaxis_0_min_neg = -4000;
 int jaxis_0_min_neg = -3200;
 int jaxis_0_min_pos = -jaxis_0_min_neg;
 int jaxis_1_rest_min = jaxis_0_min_neg;
@@ -158,6 +161,12 @@ void main_loop_function()
 				case SDLK_DOWN:
 					player_move_speed = -PLAYER_WALK_SPEED;
 					break;
+				case SDLK_RIGHT:
+					player_turn_speed = -SLOW_TURN_SPEED;
+					break;
+				case SDLK_LEFT:
+					player_turn_speed = SLOW_TURN_SPEED;
+					break;
 				}
 				break;
 			case SDL_KEYUP   :
@@ -169,15 +178,40 @@ void main_loop_function()
 				case SDLK_DOWN:
 					player_move_speed = 0;
 					break;
+				case SDLK_RIGHT:
+					player_turn_speed = 0;
+					break;
+				case SDLK_LEFT:
+					player_turn_speed = 0;
+					break;
 				}
 				break;
 			case SDL_JOYAXISMOTION:  /* Handle Joystick Motion */
 		    	if (event.jaxis.axis == 0) {
-		    		// rotate the camera target
-		    		//rotateView(angle_amount * -0.0001f * event.jaxis.value);
+					// move the camera toward the camera target
+			    	if (event.jaxis.value > jaxis_0_min_pos) {
+			    		if (event.jaxis.value > jaxis_0_max_pos) {
+			    			player_turn_speed = -MAX_TURN_SPEED;
+			    		} else {
+			    			player_turn_speed = -((float)(event.jaxis.value - jaxis_0_min_pos) / (float)(jaxis_0_max_pos - jaxis_0_min_pos) *
+								(float)(MAX_TURN_SPEED - MIN_TURN_SPEED));
+			    		}
+			    	} else {
+			    		if (event.jaxis.value >= jaxis_0_min_neg) {
+			    			// at rest
+			    			player_turn_speed = 0;
+			    		} else {
+			    			if (event.jaxis.value < jaxis_0_max_neg) {
+			    				player_turn_speed = MAX_TURN_SPEED;
+			    			} else {
+				    			player_turn_speed = ((float)(event.jaxis.value - jaxis_0_min_neg) /
+						    			(float)(jaxis_0_max_neg - jaxis_0_min_neg) *
+										(float)(MAX_TURN_SPEED - MIN_TURN_SPEED));
 
-					//rotateView(DEG_TO_RAD(player_turn_speed * MS_TO_SEC(loop_duration)));
+			    			}
 
+			    		}
+			    	}
 			    } else if (event.jaxis.axis == 1) {
 					// move the camera toward the camera target
 			    	if (event.jaxis.value > jaxis_1_rest_max) {
@@ -247,12 +281,8 @@ void main_loop_function()
 			case SDL_QUIT    : return; break;
 			}
 		}
-		// Check keypresses
-		if(key[SDLK_RIGHT]) {
-			rotateView(-DEG_TO_RAD(player_turn_speed * MS_TO_SEC(loop_duration)));
-		}
-		if(key[SDLK_LEFT]) {
-			// positive angle
+
+		if (player_turn_speed != 0) {
 			rotateView(DEG_TO_RAD(player_turn_speed * MS_TO_SEC(loop_duration)));
 		}
 
