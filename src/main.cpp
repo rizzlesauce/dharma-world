@@ -20,13 +20,19 @@
 #include "RzVector.h"
 #include "floor.h"
 #include "wall1.h"
+#include "wall2.h"
+#include "wall3.h"
+#include "wall4.h"
+#include "ceiling.h"
 
 using namespace std;
 
-#define WINDOW_WIDTH 700
-#define WINDOW_HEIGHT 700
+#define DEFAULT_WINDOW_WIDTH 700
+#define DEFAULT_WINDOW_HEIGHT 700
 
-#define UNIT_PER_METER 1.5f
+//#define UNIT_PER_METER 1.5f
+#define UNIT_PER_METER 1.0f
+
 #define METER_TO_UNIT(m) ((float)m * UNIT_PER_METER)
 #define UNIT_TO_METER(u) ((float)u / UNIT_PER_METER)
 #define MS_TO_SEC(ms) ((float)ms / 1000.0f)
@@ -39,6 +45,8 @@ using namespace std;
 #define SLOW_TURN_SPEED 72.0f // degrees per second
 #define MAX_TURN_SPEED 180.0f // degrees per second
 #define MIN_TURN_SPEED 0.0f // degrees per second
+
+bool fullscreen = true;
 
 float player_move_speed = 0; // meters per second
 float player_turn_speed = 0; // degrees per second
@@ -59,23 +67,43 @@ Uint32 loop_duration, current_ticks, loop_start;
 // Keydown booleans
 bool key[321];
 
+int window_width = DEFAULT_WINDOW_WIDTH;
+int window_height = DEFAULT_WINDOW_HEIGHT;
+
 //POINT4D light_pos = {METER_TO_UNIT(0), METER_TO_UNIT(5), METER_TO_UNIT(0), 1.0f};
-POINT4D light_pos = {METER_TO_UNIT(0), METER_TO_UNIT(PLAYER_EYE_HEIGHT), METER_TO_UNIT(-8), 1.0f};
+POINT4D light_pos = {METER_TO_UNIT(0), METER_TO_UNIT(3), METER_TO_UNIT(0), 1.0f};
 RzColor3f light_color;
 RzColor3f ambient_light;
 RzColor3f specular_highlight;
 int quitButton = 0;
 
 //float eye_z, near_z, far_z, other_factor;
-POINT3D camera_position = {0.0f, METER_TO_UNIT(PLAYER_EYE_HEIGHT), METER_TO_UNIT(8)};
-POINT3D camera_target = {0.0f, METER_TO_UNIT(PLAYER_EYE_HEIGHT), 0.0f};
+POINT3D camera_position = {METER_TO_UNIT(0), METER_TO_UNIT(PLAYER_EYE_HEIGHT), METER_TO_UNIT(0)};
+POINT3D camera_target = {METER_TO_UNIT(0), METER_TO_UNIT(PLAYER_EYE_HEIGHT), METER_TO_UNIT(-1)};
 VECTOR3D camera_up = {0.0f, 1.0f, 0.0f};
 float near_z = 0.1;
 float far_z = 100;
 float field_of_view = 45; // degrees
 
-float angle_amount = 0.05f;
-float move_amount = 0.1f;
+void reshapeGL(int width, int height) // reshape the window when it's moved or resized
+{
+	glViewport(0, 0, (GLsizei)(width), (GLsizei)(height));
+    // reset the current viewport
+	glMatrixMode(GL_PROJECTION);
+	// select the projection matrix
+	glLoadIdentity();
+	// reset the projection matrix
+	gluPerspective(field_of_view, (GLfloat)(width)/(GLfloat)(height), near_z, far_z);
+	// calculate the aspect ratio of the window
+	glMatrixMode(GL_MODELVIEW);
+	// select the modelview matrix
+	glLoadIdentity();
+	// reset the modelview matrix
+
+	window_width = width;
+	window_height = height;
+	return;
+}
 
 void my_audio_callback(void *userdata, Uint8 *stream, int len) {
 }
@@ -122,22 +150,35 @@ void rotateView(float my_angle) {
 	Mat_Mul_4X4_VECTOR4D(&transform_matrix, &target, &result_vector);
 
 	//VECTOR3D_INITXYZ(&camera_target, result_vector.x, result_vector.y, result_vector.z);
-	VECTOR3D_INITXYZ(&camera_target, result_vector.x, PLAYER_EYE_HEIGHT, result_vector.z);
+	VECTOR3D_INITXYZ(&camera_target, result_vector.x, METER_TO_UNIT(PLAYER_EYE_HEIGHT), result_vector.z);
 
+	// make sure the vector from camera to target is normal (doesn't get too big or small)
+	VECTOR3D target_vector = { camera_target.x - camera_position.x,
+			camera_target.y - camera_position.y,
+			camera_target.z - camera_position.z };
+
+	VECTOR3D_Normalize(&target_vector);
+	VECTOR3D_Add(&target_vector, &camera_target, &camera_target);
 }
 
 void moveByAmount(float amount) {
 	VECTOR3D target_vector = { camera_target.x - camera_position.x,
 			camera_target.y - camera_position.y,
 			camera_target.z - camera_position.z };
+
 	VECTOR3D_Normalize(&target_vector);
 	VECTOR3D_Scale(amount, &target_vector);
+
+	// figure out if we're crossing an important boundary
+
+
+	// make the move
 	VECTOR3D_Add(&target_vector, &camera_position, &camera_position);
 	VECTOR3D_Add(&target_vector, &camera_target, &camera_target);
 
 	// stay on the floor
-	camera_position.y = PLAYER_EYE_HEIGHT;
-	camera_target.y = PLAYER_EYE_HEIGHT;
+	camera_position.y = METER_TO_UNIT(PLAYER_EYE_HEIGHT);
+	camera_target.y = METER_TO_UNIT(PLAYER_EYE_HEIGHT);
 }
 
 void main_loop_function()
@@ -151,6 +192,8 @@ void main_loop_function()
 	{
 		if (SDL_PollEvent(&event)) {
 			switch(event.type) {
+			case SDL_VIDEORESIZE:
+
 			case SDL_KEYDOWN :
 				key[event.key.keysym.sym] = true;
 				switch(event.key.keysym.sym) {
@@ -166,6 +209,9 @@ void main_loop_function()
 					break;
 				case SDLK_LEFT:
 					player_turn_speed = SLOW_TURN_SPEED;
+					break;
+				case SDLK_ESCAPE:
+					return;
 					break;
 				}
 				break;
@@ -304,29 +350,48 @@ void main_loop_function()
 		// draw the scene
 
 		glPushMatrix();
-		glColor3f(0.4, 0.4, 0.4);
 
 		glRotatef(-90.0f, 1.0f, 0.0f, 0.0f);
+
 		glEnableClientState(GL_VERTEX_ARRAY);
 		glEnableClientState(GL_NORMAL_ARRAY);
+
+		// floor
+		glColor3f(0.4, 0.4, 0.4);
 		glVertexPointer(3, GL_FLOAT, sizeof(VERTEX_DATA_3D), &floorVertexData[0].vertex);
 		glNormalPointer(GL_FLOAT, sizeof(VERTEX_DATA_3D), &floorVertexData[0].normal);
 		glDrawArrays(GL_TRIANGLES, 0, floorNumberOfVertices);
-		glDisableClientState(GL_VERTEX_ARRAY);
-		glDisableClientState(GL_NORMAL_ARRAY);
 
-		glPopMatrix();
-
-		glPushMatrix();
-		glColor3f(0.8, 0.0, 0.0);
-		glTranslatef(4, 1.5, 0);
-		glRotatef(-90.0f, 1.0f, 0.0f, 0.0f);
-
-		glEnableClientState(GL_VERTEX_ARRAY);
-		glEnableClientState(GL_NORMAL_ARRAY);
+		// wall1
+		glColor3f(0.5, 0.0, 0.0);
 		glVertexPointer(3, GL_FLOAT, sizeof(VERTEX_DATA_3D), &wall1VertexData[0].vertex);
 		glNormalPointer(GL_FLOAT, sizeof(VERTEX_DATA_3D), &wall1VertexData[0].normal);
 		glDrawArrays(GL_TRIANGLES, 0, wall1NumberOfVertices);
+
+		// wall2
+		glColor3f(0.0, 0.5, 0.0);
+		glVertexPointer(3, GL_FLOAT, sizeof(VERTEX_DATA_3D), &wall2VertexData[0].vertex);
+		glNormalPointer(GL_FLOAT, sizeof(VERTEX_DATA_3D), &wall2VertexData[0].normal);
+		glDrawArrays(GL_TRIANGLES, 0, wall2NumberOfVertices);
+
+		// wall3
+		glColor3f(0.0, 0.0, 1.0);
+		glVertexPointer(3, GL_FLOAT, sizeof(VERTEX_DATA_3D), &wall3VertexData[0].vertex);
+		glNormalPointer(GL_FLOAT, sizeof(VERTEX_DATA_3D), &wall3VertexData[0].normal);
+		glDrawArrays(GL_TRIANGLES, 0, wall3NumberOfVertices);
+
+		// wall4
+		glColor3f(0.5, 0.0, 0.5);
+		glVertexPointer(3, GL_FLOAT, sizeof(VERTEX_DATA_3D), &wall4VertexData[0].vertex);
+		glNormalPointer(GL_FLOAT, sizeof(VERTEX_DATA_3D), &wall4VertexData[0].normal);
+		glDrawArrays(GL_TRIANGLES, 0, wall4NumberOfVertices);
+
+		// ceiling
+		glColor3f(0.4, 0.4, 0.4);
+		glVertexPointer(3, GL_FLOAT, sizeof(VERTEX_DATA_3D), &ceilingVertexData[0].vertex);
+		glNormalPointer(GL_FLOAT, sizeof(VERTEX_DATA_3D), &ceilingVertexData[0].normal);
+		glDrawArrays(GL_TRIANGLES, 0, ceilingNumberOfVertices);
+
 		glDisableClientState(GL_VERTEX_ARRAY);
 		glDisableClientState(GL_NORMAL_ARRAY);
 
@@ -410,19 +475,11 @@ void GL_Setup(int width, int height)
 	GLfloat material_shininess[] = { 4.0f };
     glMaterialfv(GL_FRONT, GL_SHININESS, material_shininess);
 
-	glClearColor(0.3, 0.3, 1.0, 0.0);
+	//glClearColor(0.3, 0.3, 1.0, 0.0);
+    glClearColor(0, 0, 0, 0);
     glShadeModel(GL_SMOOTH);
 
-	//glViewport(0, 0, width, height);
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	//glOrtho(0, width, height, 0, 0, 1);
-	gluPerspective(field_of_view, (float)width/height, near_z, far_z);
-
-	glMatrixMode(GL_MODELVIEW);
-	//glLoadIdentity();
-	//glTranslatef(0.375, 0.375, 0);
-
+    reshapeGL(width, height);
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 }
 
@@ -510,6 +567,13 @@ int main(int argc, char *argv[]) {
 
 		const SDL_VideoInfo* info = SDL_GetVideoInfo();
 		int vidFlags = SDL_OPENGL | SDL_GL_DOUBLEBUFFER;
+		if (fullscreen) {
+			vidFlags |= SDL_RESIZABLE;
+			vidFlags |= SDL_FULLSCREEN;
+			window_width = info->current_w;
+			window_height = info->current_h;
+		}
+
 		if (info->hw_available) {
 			vidFlags |= SDL_HWSURFACE;
 			Debugger::getInstance().print("using hardware surface");
@@ -518,8 +582,8 @@ int main(int argc, char *argv[]) {
 			Debugger::getInstance().print("using software surface");
 		}
 		int bpp = info->vfmt->BitsPerPixel;
-		SDL_SetVideoMode(WINDOW_WIDTH, WINDOW_HEIGHT, bpp, vidFlags);
-		GL_Setup(WINDOW_WIDTH, WINDOW_HEIGHT);
+		SDL_SetVideoMode(window_width, window_height, bpp, vidFlags);
+		GL_Setup(window_width, window_height);
 
 
 		main_loop_function();
