@@ -18,6 +18,8 @@
 #include "matrixmath.h"
 #include "RzMatrix.h"
 #include "RzVector.h"
+#include "floor.h"
+#include "wall1.h"
 
 using namespace std;
 
@@ -204,6 +206,36 @@ void main_loop_function()
 
 		// draw the scene
 
+		glPushMatrix();
+		glColor3f(0.4, 0.4, 0.4);
+
+		glRotatef(-90.0f, 1.0f, 0.0f, 0.0f);
+		glEnableClientState(GL_VERTEX_ARRAY);
+		glEnableClientState(GL_NORMAL_ARRAY);
+		glVertexPointer(3, GL_FLOAT, sizeof(VERTEX_DATA_3D), &floorVertexData[0].vertex);
+		glNormalPointer(GL_FLOAT, sizeof(VERTEX_DATA_3D), &floorVertexData[0].normal);
+		glDrawArrays(GL_TRIANGLES, 0, floorNumberOfVertices);
+		glDisableClientState(GL_VERTEX_ARRAY);
+		glDisableClientState(GL_NORMAL_ARRAY);
+
+		glPopMatrix();
+
+		glPushMatrix();
+		glColor3f(0.8, 0.0, 0.0);
+		glTranslatef(4, 1.5, 0);
+		glRotatef(-90.0f, 1.0f, 0.0f, 0.0f);
+
+		glEnableClientState(GL_VERTEX_ARRAY);
+		glEnableClientState(GL_NORMAL_ARRAY);
+		glVertexPointer(3, GL_FLOAT, sizeof(VERTEX_DATA_3D), &wall1VertexData[0].vertex);
+		glNormalPointer(GL_FLOAT, sizeof(VERTEX_DATA_3D), &wall1VertexData[0].normal);
+		glDrawArrays(GL_TRIANGLES, 0, wall1NumberOfVertices);
+		glDisableClientState(GL_VERTEX_ARRAY);
+		glDisableClientState(GL_NORMAL_ARRAY);
+
+		glPopMatrix();
+
+		/*
 		// the floor
 		glBegin(GL_QUADS);
 		glColor3f(0.4, 0.4, 0.4);
@@ -213,6 +245,7 @@ void main_loop_function()
 		glVertex3f(5, 0, 5);
 		glVertex3f(-5, 0, 5);
 		glEnd();
+		*/
 
 		SDL_GL_SwapBuffers();
 		// Check keypresses
