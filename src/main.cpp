@@ -34,10 +34,22 @@ using namespace std;
 #define PLAYER_EYE_HEIGHT 1.5f // meters
 
 #define PLAYER_WALK_SPEED 1.0f // meters per second
+#define PLAYER_MAX_SPEED 3.0f // meters per second
+#define PLAYER_MIN_SPEED 0.0f // meters per second
 #define SLOW_TURN_SPEED 72.0f // degrees per second
 
-float player_move_speed = PLAYER_WALK_SPEED; // meters per second
+float player_move_speed = 0; // meters per second
 float player_turn_speed = SLOW_TURN_SPEED; // degrees per second
+
+int jaxis_0_min_neg = -3200;
+int jaxis_0_min_pos = -jaxis_0_min_neg;
+int jaxis_1_rest_min = jaxis_0_min_neg;
+int jaxis_1_rest_max = jaxis_0_min_pos;
+
+int jaxis_0_max_neg = -32768;
+int jaxis_0_max_pos = -jaxis_0_max_neg;
+int jaxis_1_max_neg = jaxis_0_max_neg;
+int jaxis_1_max_pos = jaxis_0_max_pos;
 
 Uint32 loop_duration, current_ticks, loop_start;
 
@@ -106,7 +118,9 @@ void rotateView(float my_angle) {
 
 	Mat_Mul_4X4_VECTOR4D(&transform_matrix, &target, &result_vector);
 
-	VECTOR3D_INITXYZ(&camera_target, result_vector.x, result_vector.y, result_vector.z);
+	//VECTOR3D_INITXYZ(&camera_target, result_vector.x, result_vector.y, result_vector.z);
+	VECTOR3D_INITXYZ(&camera_target, result_vector.x, PLAYER_EYE_HEIGHT, result_vector.z);
+
 }
 
 void moveByAmount(float amount) {
@@ -120,79 +134,132 @@ void moveByAmount(float amount) {
 
 	// stay on the floor
 	camera_position.y = PLAYER_EYE_HEIGHT;
-}
-
-// Process pending events
-bool events() {
-	stringstream ss;
-	SDL_Event event;
-	if (SDL_PollEvent(&event)) {
-		switch(event.type) {
-		case SDL_KEYDOWN : key[event.key.keysym.sym] = true; break;
-		case SDL_KEYUP   : key[event.key.keysym.sym] = false; break;
-		case SDL_JOYAXISMOTION:  /* Handle Joystick Motion */
-		    if ((event.jaxis.value < -3200) || (event.jaxis.value > 3200)) {
-		    	if (event.jaxis.axis == 0) {
-		    		// rotate the camera target
-		    		rotateView(angle_amount * -0.0001f * event.jaxis.value);
-
-			    } else if (event.jaxis.axis == 1) {
-					// move the camera toward the camera target
-			    	moveByAmount(move_amount * -0.0001f * event.jaxis.value);
-				}
-		    	/*
-		    	Debugger::getInstance().print("axis: " + Utils::getInstance().itos(event.jaxis.axis)
-		    			+ ", value: " + Utils::getInstance().itos(event.jaxis.value));
-		    			*/
-		    }
-		    break;
-		case SDL_JOYBUTTONDOWN:  /* Handle Joystick Button Presses */
-		    if ( event.jbutton.button == 0 )
-		    {
-		        /* code goes here */
-		    }
-		    /*
-		    Debugger::getInstance().print("button down: " + Utils::getInstance().itos(event.jbutton.button));
-		    */
-		    break;
-		case SDL_JOYBUTTONUP:  /* Handle Joystick Button Presses */
-		    if ( event.jbutton.button == quitButton )
-		    {
-		        /* code goes here */
-		    	return false;
-		    }
-		    /*
-		    Debugger::getInstance().print("button up: " + Utils::getInstance().itos(event.jbutton.button));
-		    */
-		    break;
-		case SDL_JOYHATMOTION:  /* Handle Hat Motion */
-			/*
-		    if ( event.jhat.value & SDL_HAT_UP )
-		    {
-		    	Debugger::getInstance().print("joystick hat up");
-		    }
-		    if ( event.jhat.value & SDL_HAT_LEFT )
-		    {
-		    	Debugger::getInstance().print("joystick hat left");
-		    }
-		    if ( event.jhat.value & SDL_HAT_RIGHTDOWN )
-		    {
-		    }
-		    Debugger::getInstance().print("hat motion: " + Utils::getInstance().itos(event.jhat.value));
-		    */
-		    break;
-		case SDL_QUIT    : return false; break;
-		}
-	}
-	return true;
+	camera_target.y = PLAYER_EYE_HEIGHT;
 }
 
 void main_loop_function()
 {
 	loop_start = SDL_GetTicks();
 
-	while(events())
+	stringstream ss;
+	SDL_Event event;
+
+	while(true)
 	{
+		if (SDL_PollEvent(&event)) {
+			switch(event.type) {
+			case SDL_KEYDOWN :
+				key[event.key.keysym.sym] = true;
+				switch(event.key.keysym.sym) {
+				case SDLK_UP:
+					// figure out how far the player should go
+					player_move_speed = PLAYER_WALK_SPEED;
+					break;
+				case SDLK_DOWN:
+					player_move_speed = -PLAYER_WALK_SPEED;
+					break;
+				}
+				break;
+			case SDL_KEYUP   :
+				key[event.key.keysym.sym] = false;
+				switch(event.key.keysym.sym) {
+				case SDLK_UP:
+					player_move_speed = 0;
+					break;
+				case SDLK_DOWN:
+					player_move_speed = 0;
+					break;
+				}
+				break;
+			case SDL_JOYAXISMOTION:  /* Handle Joystick Motion */
+		    	if (event.jaxis.axis == 0) {
+		    		// rotate the camera target
+		    		//rotateView(angle_amount * -0.0001f * event.jaxis.value);
+
+					//rotateView(DEG_TO_RAD(player_turn_speed * MS_TO_SEC(loop_duration)));
+
+			    } else if (event.jaxis.axis == 1) {
+					// move the camera toward the camera target
+			    	if (event.jaxis.value > jaxis_1_rest_max) {
+			    		if (event.jaxis.value > jaxis_1_max_pos) {
+			    			player_move_speed = -PLAYER_MAX_SPEED;
+			    		} else {
+			    			player_move_speed = -((float)(event.jaxis.value - jaxis_1_rest_max) / (float)(jaxis_1_max_pos - jaxis_1_rest_max) *
+								(float)(PLAYER_MAX_SPEED - PLAYER_MIN_SPEED));
+			    		}
+			    	} else {
+			    		if (event.jaxis.value >= jaxis_1_rest_min) {
+			    			// at rest
+			    			player_move_speed = 0;
+			    		} else {
+			    			if (event.jaxis.value < jaxis_1_max_neg) {
+			    				player_move_speed = PLAYER_MAX_SPEED;
+			    			} else {
+				    			player_move_speed = ((float)(event.jaxis.value - jaxis_1_rest_min) /
+						    			(float)(jaxis_1_max_neg - jaxis_1_rest_min) *
+										(float)(PLAYER_MAX_SPEED - PLAYER_MIN_SPEED));
+
+			    			}
+
+			    		}
+			    	}
+				}
+		    	/*
+		    	Debugger::getInstance().print("axis: " + Utils::getInstance().itos(event.jaxis.axis)
+		    			+ ", value: " + Utils::getInstance().itos(event.jaxis.value));
+		    			*/
+			    break;
+			case SDL_JOYBUTTONDOWN:  /* Handle Joystick Button Presses */
+			    if ( event.jbutton.button == 0 )
+			    {
+			        /* code goes here */
+			    }
+			    /*
+			    Debugger::getInstance().print("button down: " + Utils::getInstance().itos(event.jbutton.button));
+			    */
+			    break;
+			case SDL_JOYBUTTONUP:  /* Handle Joystick Button Presses */
+			    if ( event.jbutton.button == quitButton )
+			    {
+			        /* code goes here */
+			    	return;
+			    }
+			    /*
+			    Debugger::getInstance().print("button up: " + Utils::getInstance().itos(event.jbutton.button));
+			    */
+			    break;
+			case SDL_JOYHATMOTION:  /* Handle Hat Motion */
+				/*
+			    if ( event.jhat.value & SDL_HAT_UP )
+			    {
+			    	Debugger::getInstance().print("joystick hat up");
+			    }
+			    if ( event.jhat.value & SDL_HAT_LEFT )
+			    {
+			    	Debugger::getInstance().print("joystick hat left");
+			    }
+			    if ( event.jhat.value & SDL_HAT_RIGHTDOWN )
+			    {
+			    }
+			    Debugger::getInstance().print("hat motion: " + Utils::getInstance().itos(event.jhat.value));
+			    */
+			    break;
+			case SDL_QUIT    : return; break;
+			}
+		}
+		// Check keypresses
+		if(key[SDLK_RIGHT]) {
+			rotateView(-DEG_TO_RAD(player_turn_speed * MS_TO_SEC(loop_duration)));
+		}
+		if(key[SDLK_LEFT]) {
+			// positive angle
+			rotateView(DEG_TO_RAD(player_turn_speed * MS_TO_SEC(loop_duration)));
+		}
+
+		if (player_move_speed != 0) {
+			moveByAmount(METER_TO_UNIT(player_move_speed * MS_TO_SEC(loop_duration)));
+		}
+
 		current_ticks = SDL_GetTicks();
 		loop_duration = current_ticks - loop_start;
 		loop_start = current_ticks;
@@ -248,21 +315,6 @@ void main_loop_function()
 		*/
 
 		SDL_GL_SwapBuffers();
-		// Check keypresses
-		if(key[SDLK_RIGHT]) {
-			rotateView(-DEG_TO_RAD(player_turn_speed * MS_TO_SEC(loop_duration)));
-		}
-		if(key[SDLK_LEFT]) {
-			// positive angle
-			rotateView(DEG_TO_RAD(player_turn_speed * MS_TO_SEC(loop_duration)));
-		}
-		if (key[SDLK_UP]) {
-			// figure out how far the player should go
-			moveByAmount(METER_TO_UNIT(player_move_speed * MS_TO_SEC(loop_duration)));
-		}
-		if (key[SDLK_DOWN]) {
-			moveByAmount(-METER_TO_UNIT(player_move_speed * MS_TO_SEC(loop_duration)));
-		}
 	}
 }
 
