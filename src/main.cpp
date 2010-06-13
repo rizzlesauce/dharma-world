@@ -24,6 +24,8 @@
 #include "wall3.h"
 #include "wall4.h"
 #include "ceiling.h"
+#include "gltypes.h"
+#include "dharmacube.h"
 
 using namespace std;
 
@@ -46,7 +48,7 @@ using namespace std;
 #define MAX_TURN_SPEED 180.0f // degrees per second
 #define MIN_TURN_SPEED 0.0f // degrees per second
 
-bool fullscreen = true;
+bool fullscreen = false;
 
 float player_move_speed = 0; // meters per second
 float player_turn_speed = 0; // degrees per second
@@ -64,14 +66,41 @@ int jaxis_1_max_pos = jaxis_0_max_pos;
 
 Uint32 loop_duration, current_ticks, loop_start;
 
+Uint8 *bird_buffer = NULL;
+Uint8 *bird_position = NULL;
+Uint32 bird_length = 0;
+
+GLuint texture;
+
 // Keydown booleans
 bool key[321];
+
+bool print_this_iteration = false;
+
+typedef struct LINE_SEGMENT_3D {
+	VERTEX_DATA_3D data1;
+	VERTEX_DATA_3D data2;
+} LINE_SEGMENT_3D, *LINE_SEGMENT_3D_PTR;
+
+LINE_SEGMENT_3D boundaries[] = {
+		// wall1
+		{ wall1VertexData[9], wall1VertexData[11] },
+		{ wall1VertexData[12], wall1VertexData[17] },
+		// wall2
+		{ wall2VertexData[0], wall2VertexData[1] },
+		// wall3
+		{ wall3VertexData[9], wall3VertexData[11] },
+		{ wall3VertexData[12], wall3VertexData[17] },
+		// wall4
+		{ wall4VertexData[0], wall4VertexData[1] },
+};
+#define numberOfBoundaries 6
 
 int window_width = DEFAULT_WINDOW_WIDTH;
 int window_height = DEFAULT_WINDOW_HEIGHT;
 
 //POINT4D light_pos = {METER_TO_UNIT(0), METER_TO_UNIT(5), METER_TO_UNIT(0), 1.0f};
-POINT4D light_pos = {METER_TO_UNIT(0), METER_TO_UNIT(2.5), METER_TO_UNIT(0), 1.0f};
+POINT4D light_pos = {METER_TO_UNIT(0), METER_TO_UNIT(1.5), METER_TO_UNIT(0), 1.0f};
 RzColor3f light_color;
 RzColor3f ambient_light;
 RzColor3f specular_highlight;
@@ -84,6 +113,19 @@ VECTOR3D camera_up = {0.0f, 1.0f, 0.0f};
 float near_z = 0.1;
 float far_z = 100;
 float field_of_view = 45; // degrees
+
+void swapPointers(void **v1, void **v2) {
+	void *tmp_v = *v1;
+	*v1 = *v2;
+	*v2 = tmp_v;
+}
+
+void doCollision() {
+    // play the bird sound
+    SDL_LockAudio();
+    bird_position = bird_buffer;
+    SDL_UnlockAudio();
+}
 
 void reshapeGL(int width, int height) // reshape the window when it's moved or resized
 {
@@ -106,6 +148,20 @@ void reshapeGL(int width, int height) // reshape the window when it's moved or r
 }
 
 void my_audio_callback(void *userdata, Uint8 *stream, int len) {
+	if (bird_position != NULL) {
+		// play the bird sound
+		Uint32 length_to_go = bird_buffer + bird_length - bird_position;
+
+		if (length_to_go == 0) {
+			bird_position = NULL;
+			return;
+		}
+
+        /* Mix as much data as possible */
+        len = (len > length_to_go ? length_to_go : len);
+        SDL_MixAudio(stream, bird_position, len, SDL_MIX_MAXVOLUME);
+        bird_position += len;
+	}
 }
 
 // in radians
@@ -166,11 +222,75 @@ void moveByAmount(float amount) {
 			camera_target.y - camera_position.y,
 			camera_target.z - camera_position.z };
 
+	VECTOR3D safe_vector;
+
 	VECTOR3D_Normalize(&target_vector);
-	VECTOR3D_Scale(amount, &target_vector);
+
+	float safe_amount = METER_TO_UNIT(0.2);
+	if (amount < 0) {
+		safe_amount = -safe_amount;
+	}
+
+	VECTOR3D_Scale(amount + safe_amount, &target_vector, &safe_vector);
+
+	VECTOR3D new_position;
+	VECTOR3D_Add(&safe_vector, &camera_position, &new_position);
+
+	stringstream ss;
+
+	//VERTEX_DATA_3D *x_min_data, *x_max_data;
+	GLfloat *x_min_vertex, *x_max_vertex;
 
 	// figure out if we're crossing an important boundary
+	for (int i = 0; i < numberOfBoundaries; ++i) {
+		float temp_float;
+		//x_min_data = boundaries[i].data1;
+		//x_max_data = boundaries[i].data2;
 
+		x_min_vertex = boundaries[i].data1.vertex;
+		x_max_vertex = boundaries[i].data2.vertex;
+		if (x_min_vertex[0] > x_max_vertex[0]) {
+			swapPointers((void**)&x_min_vertex, (void**)&x_max_vertex);
+		}
+		float x_min_boundary = x_min_vertex[0];
+		float x_max_boundary = x_max_vertex[0];
+		if (x_min_boundary == x_max_boundary) {
+			x_max_boundary += EPSILON_E3;
+		}
+		float m_boundary = (x_max_vertex[2] - x_min_vertex[2]) /
+				(x_max_boundary - x_min_boundary);
+		float b_boundary = (x_max_vertex[2]
+		        - (m_boundary * x_max_boundary));
+
+		float x_min_movement = camera_position.x;
+		float x_max_movement = new_position.x;
+		if (x_min_movement > x_max_movement) {
+			SWAP(x_min_movement, x_max_movement, temp_float);
+		}
+		float m_movement = (safe_vector.z / safe_vector.x);
+		float b_movement = (new_position.z - m_movement * new_position.x);
+
+		float x_intersect = ((b_movement - b_boundary) / (m_boundary - m_movement));
+
+		if (print_this_iteration) {
+			ss.clear();
+			ss << "x_min_boundary: " << x_min_boundary << endl;
+			ss << "x_max_boundary: " << x_max_boundary << endl;
+			ss << "x_min_movement: " << x_min_movement << endl;
+			ss << "x_max_movement: " << x_max_movement << endl;
+			ss << "x_intersect: " << x_intersect << endl;
+			Debugger::getInstance().print(ss.str());
+		}
+
+		if (x_intersect >= x_min_movement && x_intersect <= x_max_movement &&
+				x_intersect >= x_min_boundary && x_intersect <= x_max_boundary) {
+				// Housten, we have an intersection
+			doCollision();
+			return;
+		}
+	}
+
+	VECTOR3D_Scale(amount, &target_vector);
 
 	// make the move
 	VECTOR3D_Add(&target_vector, &camera_position, &camera_position);
@@ -327,6 +447,11 @@ void main_loop_function()
 			case SDL_QUIT    : return; break;
 			}
 		}
+		if (key[SDLK_p]) {
+			print_this_iteration = true;
+		} else {
+			print_this_iteration = false;
+		}
 
 		if (player_turn_speed != 0) {
 			rotateView(DEG_TO_RAD(player_turn_speed * MS_TO_SEC(loop_duration)));
@@ -392,6 +517,26 @@ void main_loop_function()
 		glDisableClientState(GL_NORMAL_ARRAY);
 
 		/*
+		// draw the dharma cube
+		glPushMatrix();
+		glRotatef(0.0, 0.0, 1.0, 0.0);
+
+		glEnableClientState(GL_VERTEX_ARRAY);
+		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+		glEnableClientState(GL_NORMAL_ARRAY);
+		glVertexPointer(3, GL_FLOAT, sizeof(TEXTURED_VERTEX_DATA_3D), &dharmaCubeVertexData[0].vertex);
+		glNormalPointer(GL_FLOAT, sizeof(TEXTURED_VERTEX_DATA_3D), &dharmaCubeVertexData[0].normal);
+		glTexCoordPointer(2, GL_FLOAT, sizeof(TEXTURED_VERTEX_DATA_3D), &dharmaCubeVertexData[0].texCoord);
+		//glColor3f(0.0, 0.0, 1.0);
+		glDrawArrays(GL_TRIANGLES, 0, dharmaCubeNumberOfVertices);
+		glDisableClientState(GL_VERTEX_ARRAY);
+		glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+		glDisableClientState(GL_NORMAL_ARRAY);
+		glPopMatrix();
+		*/
+
+
+		/*
 		// the floor
 		glBegin(GL_QUADS);
 		glColor3f(0.4, 0.4, 0.4);
@@ -411,9 +556,14 @@ void main_loop_function()
 void GL_Setup(int width, int height)
 {
 	//Load Bitmaps
+	//Load Bitmap
+	SDL_Surface* bmpFile = SDL_LoadBMP("data/dharmacube.bmp");
 
 	/* Standard OpenGL texture creation code */
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+
+	glGenTextures(1, &texture);
+	glBindTexture(GL_TEXTURE_2D, texture);
 
 	// select modulate to mix texture with color for shading
     glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
@@ -424,6 +574,15 @@ void GL_Setup(int width, int height)
 	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	if (gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGB, bmpFile->w,
+			bmpFile->h, GL_BGR_EXT,
+			GL_UNSIGNED_BYTE, bmpFile->pixels) != 0) {
+		throw "error building mipmaps";
+	}
+
+	//Free surface after using it
+	SDL_FreeSurface(bmpFile);
 
 	//change the texture matrix to flip and mirror
 	glMatrixMode(GL_TEXTURE);
@@ -530,7 +689,7 @@ int main(int argc, char *argv[]) {
 		/* desired spec is no longer needed */
 		free(desired);
 
-		hardware_spec=obtained;
+		hardware_spec = obtained;
 		Debugger::getInstance().print("Audio hardware:\nfreq: " + Utils::getInstance().itos(hardware_spec->freq) +
 				"\n" +
 				"channels: " + Utils::getInstance().itos(hardware_spec->channels) +
@@ -538,6 +697,39 @@ int main(int argc, char *argv[]) {
 				"samples: " + Utils::getInstance().itos(hardware_spec->samples) +
 				"\n"
 				);
+
+		/* Load the WAV */
+		if (SDL_LoadWAV("data/bird.wav", &wav_spec, &wav_buffer, &wav_length) == NULL) {
+			ss.clear();
+			ss << "Could not open test.wav: " << SDL_GetError() << endl;
+			throw ss.str();
+		}
+
+		/* Build AudioCVT */
+		ret = SDL_BuildAudioCVT(&wav_cvt,
+		                        wav_spec.format, wav_spec.channels, wav_spec.freq,
+		                        hardware_spec->format, hardware_spec->channels, hardware_spec->freq);
+
+		/* Check that the convert was built */
+		if (ret == -1) {
+			ss.clear();
+			ss << "Couldn't build converter!" << endl;
+			throw ss.str();
+		}
+
+		/* Setup for conversion, copy original data to new buffer*/
+		wav_cvt.buf = (Uint8*)malloc(wav_length * wav_cvt.len_mult);
+		wav_cvt.len = wav_length;
+		memcpy(wav_cvt.buf, wav_buffer, wav_length);
+
+		/* We can delete to original WAV data now */
+		SDL_FreeWAV(wav_buffer);
+
+		/* And now we're ready to convert */
+		SDL_ConvertAudio(&wav_cvt);
+		bird_buffer = wav_cvt.buf;
+		bird_length = wav_cvt.len;
+
 
 		/* Start playing */
 		SDL_PauseAudio(0);
@@ -589,10 +781,14 @@ int main(int argc, char *argv[]) {
 		SDL_JoystickClose(joystick);
 	}
 	SDL_CloseAudio();
+	if (bird_buffer != NULL) {
+		SDL_FreeWAV(bird_buffer);
+	}
 	if (hardware_spec != NULL) {
 		free(hardware_spec);
 	}
 	// delete textures
+	glDeleteTextures(1, &texture);
 
 	return 0;
 }
