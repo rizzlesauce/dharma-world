@@ -39,7 +39,7 @@ using namespace std;
 #define UNIT_TO_METER(u) ((float)u / UNIT_PER_METER)
 #define MS_TO_SEC(ms) ((float)ms / 1000.0f)
 
-#define PLAYER_EYE_HEIGHT 1.5f // meters
+#define PLAYER_EYE_HEIGHT 1.0f // meters
 
 #define PLAYER_WALK_SPEED 1.0f // meters per second
 #define PLAYER_MAX_SPEED 3.0f // meters per second
@@ -53,6 +53,9 @@ bool fullscreen = false;
 
 float player_move_speed = 0; // meters per second
 float player_turn_speed = 0; // degrees per second
+
+float dharma_turn_speed = 25.0f; // degrees per second
+float dharma_rotation = 0.0; // angle of dharma cube
 
 //int jaxis_0_min_neg = -4000;
 int jaxis_0_min_neg = -3200;
@@ -71,12 +74,13 @@ Uint8 *bird_buffer = NULL;
 Uint8 *bird_position = NULL;
 Uint32 bird_length = 0;
 
-GLuint texture;
+GLuint floor_texture;
+GLuint dharma_texture;
 
 // Keydown booleans
 bool key[321];
 
-bool print_this_iteration = false;
+//bool print_this_iteration = false;
 
 typedef struct LINE_SEGMENT_3D {
 	VERTEX_DATA_3D data1;
@@ -101,7 +105,7 @@ int window_width = DEFAULT_WINDOW_WIDTH;
 int window_height = DEFAULT_WINDOW_HEIGHT;
 
 //POINT4D light_pos = {METER_TO_UNIT(0), METER_TO_UNIT(5), METER_TO_UNIT(0), 1.0f};
-POINT4D light_pos = {METER_TO_UNIT(0), METER_TO_UNIT(1.5), METER_TO_UNIT(0), 1.0f};
+POINT4D light_pos = {METER_TO_UNIT(0), METER_TO_UNIT(5), METER_TO_UNIT(0), 1.0f};
 RzColor3f light_color;
 RzColor3f ambient_light;
 RzColor3f specular_highlight;
@@ -122,9 +126,12 @@ void swapPointers(void **v1, void **v2) {
 }
 
 void doCollision() {
+	Debugger::getInstance().print("wall collision\n");
     // play the bird sound
     SDL_LockAudio();
-    bird_position = bird_buffer;
+    if (bird_position == NULL) {
+	    bird_position = bird_buffer;
+    }
     SDL_UnlockAudio();
 }
 
@@ -273,6 +280,7 @@ void moveByAmount(float amount) {
 
 		float x_intersect = ((b_movement - b_boundary) / (m_boundary - m_movement));
 
+		/*
 		if (print_this_iteration) {
 			ss.clear();
 			ss << "x_min_boundary: " << x_min_boundary << endl;
@@ -282,6 +290,7 @@ void moveByAmount(float amount) {
 			ss << "x_intersect: " << x_intersect << endl;
 			Debugger::getInstance().print(ss.str());
 		}
+		*/
 
 		if (x_intersect >= x_min_movement && x_intersect <= x_max_movement &&
 				x_intersect >= x_min_boundary && x_intersect <= x_max_boundary) {
@@ -314,7 +323,7 @@ void main_loop_function()
 		if (SDL_PollEvent(&event)) {
 			switch(event.type) {
 			case SDL_VIDEORESIZE:
-
+				break;
 			case SDL_KEYDOWN :
 				key[event.key.keysym.sym] = true;
 				switch(event.key.keysym.sym) {
@@ -376,7 +385,6 @@ void main_loop_function()
 										(float)(MAX_TURN_SPEED - MIN_TURN_SPEED));
 
 			    			}
-
 			    		}
 			    	}
 			    } else if (event.jaxis.axis == 1) {
@@ -448,11 +456,13 @@ void main_loop_function()
 			case SDL_QUIT    : return; break;
 			}
 		}
+		/*
 		if (key[SDLK_p]) {
 			print_this_iteration = true;
 		} else {
 			print_this_iteration = false;
 		}
+		*/
 
 		if (player_turn_speed != 0) {
 			rotateView(DEG_TO_RAD(player_turn_speed * MS_TO_SEC(loop_duration)));
@@ -461,6 +471,8 @@ void main_loop_function()
 		if (player_move_speed != 0) {
 			moveByAmount(METER_TO_UNIT(player_move_speed * MS_TO_SEC(loop_duration)));
 		}
+
+		dharma_rotation += (dharma_turn_speed * MS_TO_SEC(loop_duration));
 
 		current_ticks = SDL_GetTicks();
 		loop_duration = current_ticks - loop_start;
@@ -485,6 +497,7 @@ void main_loop_function()
 		glNormalPointer(GL_FLOAT, sizeof(VERTEX_DATA_3D), &floorVertexData[0].normal);
 		glDrawArrays(GL_TRIANGLES, 0, floorNumberOfVertices);
 		*/
+		glBindTexture(GL_TEXTURE_2D, floor_texture);
 		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 		glVertexPointer(3, GL_FLOAT, sizeof(TEXTURED_VERTEX_DATA_3D), &floorVertexData[0].vertex);
 		glNormalPointer(GL_FLOAT, sizeof(TEXTURED_VERTEX_DATA_3D), &floorVertexData[0].normal);
@@ -525,27 +538,29 @@ void main_loop_function()
 		glDisableClientState(GL_VERTEX_ARRAY);
 		glDisableClientState(GL_NORMAL_ARRAY);
 
-		/*
-		// draw the dharma cube
-		glPushMatrix();
-		glRotatef(0.0, 0.0, 1.0, 0.0);
+		int numCubes = 10;
+		for (int i = 0; i < numCubes; ++i) {
+			// draw the dharma cube
+			glPushMatrix();
+			glTranslatef(METER_TO_UNIT(((numCubes / 2) - i) * METER_TO_UNIT(5)), METER_TO_UNIT(-1.5), METER_TO_UNIT(0));
+			glRotatef(dharma_rotation * ((numCubes / 2) - i), 0, 0, 1);
+			glScalef(0.7, 0.7, 0.7);
+			glBindTexture(GL_TEXTURE_2D, dharma_texture);
+			glEnableClientState(GL_VERTEX_ARRAY);
+			glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+			glEnableClientState(GL_NORMAL_ARRAY);
+			glVertexPointer(3, GL_FLOAT, sizeof(TEXTURED_VERTEX_DATA_3D), &dharmaCubeVertexData[0].vertex);
+			glNormalPointer(GL_FLOAT, sizeof(TEXTURED_VERTEX_DATA_3D), &dharmaCubeVertexData[0].normal);
+			glTexCoordPointer(2, GL_FLOAT, sizeof(TEXTURED_VERTEX_DATA_3D), &dharmaCubeVertexData[0].texCoord);
+			//glColor3f(0.0, 0.0, 1.0);
+			glDrawArrays(GL_TRIANGLES, 0, dharmaCubeNumberOfVertices);
+			glDisableClientState(GL_VERTEX_ARRAY);
+			glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+			glDisableClientState(GL_NORMAL_ARRAY);
+			glPopMatrix();
+		}
 
-		glEnableClientState(GL_VERTEX_ARRAY);
-		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-		glEnableClientState(GL_NORMAL_ARRAY);
-		glVertexPointer(3, GL_FLOAT, sizeof(TEXTURED_VERTEX_DATA_3D), &dharmaCubeVertexData[0].vertex);
-		glNormalPointer(GL_FLOAT, sizeof(TEXTURED_VERTEX_DATA_3D), &dharmaCubeVertexData[0].normal);
-		glTexCoordPointer(2, GL_FLOAT, sizeof(TEXTURED_VERTEX_DATA_3D), &dharmaCubeVertexData[0].texCoord);
-		//glColor3f(0.0, 0.0, 1.0);
-		glDrawArrays(GL_TRIANGLES, 0, dharmaCubeNumberOfVertices);
-		glDisableClientState(GL_VERTEX_ARRAY);
-		glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-		glDisableClientState(GL_NORMAL_ARRAY);
-		glPopMatrix();
-		*/
-
-
-		/*
+			/*
 		// the floor
 		glBegin(GL_QUADS);
 		glColor3f(0.4, 0.4, 0.4);
@@ -561,7 +576,7 @@ void main_loop_function()
 	}
 }
 
-// Initialze OpenGL perspective matrix
+// Initialize OpenGL perspective matrix
 void GL_Setup(int width, int height)
 {
 	//Load Bitmaps
@@ -570,10 +585,6 @@ void GL_Setup(int width, int height)
 
 	/* Standard OpenGL texture creation code */
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-
-	glGenTextures(1, &texture);
-	glBindTexture(GL_TEXTURE_2D, texture);
-
 	// select modulate to mix texture with color for shading
     glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 	//glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL);
@@ -584,12 +595,27 @@ void GL_Setup(int width, int height)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
+	glGenTextures(1, &floor_texture);
+	glBindTexture(GL_TEXTURE_2D, floor_texture);
+
 	if (gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGB, bmpFile->w,
 			bmpFile->h, GL_BGR_EXT,
 			GL_UNSIGNED_BYTE, bmpFile->pixels) != 0) {
 		throw "error building mipmaps";
 	}
+	//Free surface after using it
+	SDL_FreeSurface(bmpFile);
 
+	bmpFile = SDL_LoadBMP("data/dharmacube.bmp");
+
+	glGenTextures(1, &dharma_texture);
+	glBindTexture(GL_TEXTURE_2D, dharma_texture);
+
+	if (gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGB, bmpFile->w,
+			bmpFile->h, GL_BGR_EXT,
+			GL_UNSIGNED_BYTE, bmpFile->pixels) != 0) {
+		throw "error building mipmaps";
+	}
 	//Free surface after using it
 	SDL_FreeSurface(bmpFile);
 
@@ -708,7 +734,7 @@ int main(int argc, char *argv[]) {
 				);
 
 		/* Load the WAV */
-		if (SDL_LoadWAV("data/bird.wav", &wav_spec, &wav_buffer, &wav_length) == NULL) {
+		if (SDL_LoadWAV("data/bird2.wav", &wav_spec, &wav_buffer, &wav_length) == NULL) {
 			ss.clear();
 			ss << "Could not open test.wav: " << SDL_GetError() << endl;
 			throw ss.str();
@@ -797,7 +823,8 @@ int main(int argc, char *argv[]) {
 		free(hardware_spec);
 	}
 	// delete textures
-	glDeleteTextures(1, &texture);
+	glDeleteTextures(1, &floor_texture);
+	glDeleteTextures(1, &dharma_texture);
 
 	return 0;
 }
