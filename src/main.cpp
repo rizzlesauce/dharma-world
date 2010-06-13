@@ -48,6 +48,7 @@ using namespace std;
 #define MAX_TURN_SPEED 180.0f // degrees per second
 #define MIN_TURN_SPEED 0.0f // degrees per second
 
+//bool fullscreen = false;
 bool fullscreen = false;
 
 float player_move_speed = 0; // meters per second
@@ -478,10 +479,18 @@ void main_loop_function()
 		glEnableClientState(GL_NORMAL_ARRAY);
 
 		// floor
+		/*
 		glColor3f(0.4, 0.4, 0.4);
 		glVertexPointer(3, GL_FLOAT, sizeof(VERTEX_DATA_3D), &floorVertexData[0].vertex);
 		glNormalPointer(GL_FLOAT, sizeof(VERTEX_DATA_3D), &floorVertexData[0].normal);
 		glDrawArrays(GL_TRIANGLES, 0, floorNumberOfVertices);
+		*/
+		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+		glVertexPointer(3, GL_FLOAT, sizeof(TEXTURED_VERTEX_DATA_3D), &floorVertexData[0].vertex);
+		glNormalPointer(GL_FLOAT, sizeof(TEXTURED_VERTEX_DATA_3D), &floorVertexData[0].normal);
+		glTexCoordPointer(2, GL_FLOAT, sizeof(TEXTURED_VERTEX_DATA_3D), &floorVertexData[0].texCoord);
+		glDrawArrays(GL_TRIANGLES, 0, floorNumberOfVertices);
+		glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 
 		// wall1
 		glColor3f(0.5, 0.0, 0.0);
@@ -557,7 +566,7 @@ void GL_Setup(int width, int height)
 {
 	//Load Bitmaps
 	//Load Bitmap
-	SDL_Surface* bmpFile = SDL_LoadBMP("data/dharmacube.bmp");
+	SDL_Surface* bmpFile = SDL_LoadBMP("data/floor.bmp");
 
 	/* Standard OpenGL texture creation code */
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
