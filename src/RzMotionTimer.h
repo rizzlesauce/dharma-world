@@ -10,11 +10,11 @@
 
 class RzMotionTimer {
 public:
-	RzMotionTimer();
-	virtual ~RzMotionTimer();
+    RzMotionTimer();
+    virtual ~RzMotionTimer();
 
-	float start;
-	float rate;
+    float start;
+    float rate;
 };
 
 #endif /* RZMOTIONTIMER_H_ */
