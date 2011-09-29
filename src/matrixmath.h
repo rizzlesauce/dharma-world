@@ -1,4 +1,4 @@
-// MATRIXMATH.H - Header file for MATRIXMATH.CPP game engine library
+// Extracted from Andre Lamothe's T3DLIB1.CPP - Game Engine Part I
 
 // watch for multiple inclusions
 #ifndef MATRIXMATH
@@ -24,10 +24,6 @@
 #define FIXP16_ROUND_UP  0x00008000
 
 // MACROS /////////////////////////////////////////////////
-
-// these read the keyboard asynchronously
-//#define KEY_DOWN(vk_code) ((GetAsyncKeyState(vk_code) & 0x8000) ? 1 : 0)
-//#define KEY_UP(vk_code)   ((GetAsyncKeyState(vk_code) & 0x8000) ? 0 : 1)
 
 // this builds a 16 bit color value in 5.5.5 format (1-bit alpha mode)
 #define _RGB16BIT555(r,g,b) ((b & 31) + ((g & 31) << 5) + ((r & 31) << 10))
@@ -768,7 +764,7 @@ ma->M00 = m00; ma->M01 = m01;
 ma->M02 = m02; ma->M03 = m03;
 return(1);
 
-} // end Mat_Init_1X4
+} // end Mat_Init_1X4
 
 // 2x2 matrix functions  (note there others in T3DLIB1.CPP|H)
 void Mat_Init_2X2(MATRIX2X2_PTR ma, float m00, float m01, float m10, float m11);
@@ -798,7 +794,7 @@ void Mat_Mul_1X4_4X4(MATRIX1X4_PTR ma, MATRIX4X4_PTR mb, MATRIX1X4_PTR mprod);
 void Mat_Mul_VECTOR3D_4X4(VECTOR3D_PTR  va, MATRIX4X4_PTR mb, VECTOR3D_PTR  vprod);
 void Mat_Mul_VECTOR3D_4X3(VECTOR3D_PTR  va, MATRIX4X3_PTR mb, VECTOR3D_PTR  vprod);
 void Mat_Mul_VECTOR4D_4X4(VECTOR4D_PTR  va, MATRIX4X4_PTR mb, VECTOR4D_PTR  vprod);
-void Mat_Mul_4X4_VECTOR4D(MATRIX4X4_PTR ma, VECTOR4D_PTR  vb, VECTOR4D_PTR  vprod);void Mat_Mul_3X3_VECTOR3D(MATRIX3X3_PTR ma, VECTOR3D_PTR  vb, VECTOR3D_PTR  vprod);
+void Mat_Mul_4X4_VECTOR4D(MATRIX4X4_PTR ma, VECTOR4D_PTR  vb, VECTOR4D_PTR  vprod);void Mat_Mul_3X3_VECTOR3D(MATRIX3X3_PTR ma, VECTOR3D_PTR  vb, VECTOR3D_PTR  vprod);
 void Mat_Mul_VECTOR4D_4X3(VECTOR4D_PTR  va, MATRIX4X4_PTR mb, VECTOR4D_PTR  vprod);
 int Mat_Inverse_4X4(MATRIX4X4_PTR m, MATRIX4X4_PTR mi);
 void Mat_Init_4X4(MATRIX4X4_PTR ma,
@@ -855,7 +851,7 @@ void FIXP16_Print(FIXP16 fp);
 
 std::string MATRIX4X4_To_String(MATRIX4X4_PTR ma);
 
-std::string VECTOR4D_To_String(VECTOR4D_PTR ma);
+std::string VECTOR4D_To_String(VECTOR4D_PTR ma);
 // GLOBALS ////////////////////////////////////////////////
 
 

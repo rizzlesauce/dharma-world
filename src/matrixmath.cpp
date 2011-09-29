@@ -1,18 +1,8 @@
-// T3DLIB1.CPP - Game Engine Part I
+// Extracted from Andre Lamothe's T3DLIB1.CPP - Game Engine Part I
 
 // INCLUDES ///////////////////////////////////////////////
 
-//#define WIN32_LEAN_AND_MEAN
-
-// has the GUID library been included?
-//#ifndef INITGUID
-//#define INITGUID
-//#endif
-
-#define DEBUG_ON
-
 #include <stdlib.h>
-//#include <malloc.h>
 #include <memory.h>
 #include <string.h>
 #include <stdarg.h>
@@ -22,19 +12,10 @@
 #include <sys/timeb.h>
 #include <time.h>
 
-
 #include "matrixmath.h"
 #include <sstream>
 #include <string>
 using namespace std;
-
-// DEFINES ////////////////////////////////////////////////
-
-// TYPES //////////////////////////////////////////////////
-
-// PROTOTYPES /////////////////////////////////////////////
-
-// EXTERNALS /////////////////////////////////////////////
 
 // GLOBALS ////////////////////////////////////////////////
 
@@ -52,15 +33,15 @@ void Build_Sin_Cos_Tables(void)
 // note the creation of one extra element; 360
 // this helps with logic in using the tables
 
-// generate the tables 0 - 360 inclusive
-for (int ang = 0; ang <= 360; ang++)
+    // generate the tables 0 - 360 inclusive
+    for (int ang = 0; ang <= 360; ang++)
     {
-    // convert ang to radians
-    float theta = (float)ang*PI/(float)180;
+        // convert ang to radians
+        float theta = (float)ang*PI/(float)180;
 
-    // insert next entry into table
-    cos_look[ang] = cos(theta);
-    sin_look[ang] = sin(theta);
+        // insert next entry into table
+        cos_look[ang] = cos(theta);
+        sin_look[ang] = sin(theta);
 
     } // end for ang
 
@@ -72,7 +53,7 @@ int Mat_Mul_3X3(MATRIX3X3_PTR ma,
                MATRIX3X3_PTR mb,
                MATRIX3X3_PTR mprod)
 {
-// this function multiplies two matrices together and
+// this function multiplies two matrices together
 // and stores the result
 
 for (int row=0; row<3; row++)
@@ -1939,7 +1920,7 @@ void Mat_Mul_VECTOR4D_4X4(VECTOR4D_PTR  va,
 ////////////////////////////////////////////////////////////////////
 
 void Mat_Mul_4X4_VECTOR4D(MATRIX4X4_PTR ma,
-                          VECTOR4D_PTR  vb,                          VECTOR4D_PTR  vprod)
+                          VECTOR4D_PTR  vb,                          VECTOR4D_PTR  vprod)
 {
 // this function multiplies a 4X4 matrix against a VECTOR4D
 // - ma*vb and stores the result in mprod
@@ -1965,7 +1946,7 @@ void Mat_Mul_4X4_VECTOR4D(MATRIX4X4_PTR ma,
 
 
 void Mat_Mul_3X3_VECTOR3D(MATRIX3X3_PTR ma,
-                          VECTOR3D_PTR  vb,                          VECTOR3D_PTR  vprod)
+                          VECTOR3D_PTR  vb,                          VECTOR3D_PTR  vprod)
 {
 // this function multiplies a 3X3 matrix against a VECTOR3D
 // - ma*vb and stores the result in mprod
@@ -1989,7 +1970,7 @@ void Mat_Mul_3X3_VECTOR3D(MATRIX3X3_PTR ma,
 
 } // end Mat_Mul_VECTOR3D_3X3
 
-////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////
 void Mat_Mul_VECTOR4D_4X3(VECTOR4D_PTR  va,
                           MATRIX4X4_PTR mb,
                           VECTOR4D_PTR  vprod)
@@ -2402,7 +2383,7 @@ string VECTOR4D_To_String(VECTOR4D_PTR ma) {
     ss << ma->M[row] << ")" << endl;
 
     return ss.str();
-}
+}
 /////////////////////////////////////////////////////////////////
 
 
